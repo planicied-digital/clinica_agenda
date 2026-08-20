@@ -32,9 +32,17 @@ const STATUS_FINALIZADOS: StatusConsulta[] = [
   StatusConsulta.REMARCADA,
 ];
 
+const STATUS_CONFIRMAVEIS: StatusConsulta[] = [StatusConsulta.SOLICITADA, StatusConsulta.AGUARDANDO_CONFIRMACAO];
+
 // Prioridade dada às reservas de retorno na fila de espera (seção 5 — "parte
 // das vagas do médico fica reservada para retornos, prioridade de agenda").
 const PRIORIDADE_RETORNO = 10;
+
+// Retry padrão do BullMQ para o envio do lembrete (a exceção lançada pelo
+// WhatsappService em caso de falha no envio) — 1min/2min/4min de backoff
+// exponencial antes de desistir e deixar a Notificacao como FALHOU (seção 8).
+const TENTATIVAS_ENVIO_LEMBRETE = 3;
+const BACKOFF_INICIAL_LEMBRETE_MS = 60_000;
 
 @Injectable()
 export class ConsultasService {
@@ -157,7 +165,7 @@ export class ConsultasService {
 
   async confirmar(id: string) {
     const consulta = await this.findOne(id);
-    if (![StatusConsulta.SOLICITADA, StatusConsulta.AGUARDANDO_CONFIRMACAO].includes(consulta.status)) {
+    if (!STATUS_CONFIRMAVEIS.includes(consulta.status)) {
       throw new BadRequestException(`Consulta com status ${consulta.status} não pode ser confirmada`);
     }
     return this.prisma.consulta.update({ where: { id }, data: { status: StatusConsulta.CONFIRMADA } });
@@ -453,7 +461,16 @@ export class ConsultasService {
       if (delay <= 0) {
         return; // consulta marcada em cima da hora — pula essa etapa da régua.
       }
-      await this.lembretesQueue.add(jobName, { consultaId: consulta.id }, { delay, jobId: `${jobName}:${consulta.id}` });
+      await this.lembretesQueue.add(
+        jobName,
+        { consultaId: consulta.id },
+        {
+          delay,
+          jobId: `${jobName}:${consulta.id}`,
+          attempts: TENTATIVAS_ENVIO_LEMBRETE,
+          backoff: { type: 'exponential', delay: BACKOFF_INICIAL_LEMBRETE_MS },
+        },
+      );
     };
 
     await agendarEtapa('lembrete1', clinica.reguaLembrete1Horas);

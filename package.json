@@ -16,7 +16,8 @@
     "test:watch": "jest --watch",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "testar:lembrete-whatsapp": "ts-node scripts/testar-lembrete-whatsapp.ts"
   },
   "dependencies": {
     "@nestjs/bullmq": "^10.2.0",

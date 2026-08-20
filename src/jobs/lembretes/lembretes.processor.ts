@@ -74,17 +74,7 @@ export class LembretesProcessor extends WorkerHost {
     }
 
     const tipo = etapa === 1 ? TipoNotificacao.LEMBRETE_1 : TipoNotificacao.LEMBRETE_2;
-
-    const notificacao = await this.prisma.notificacao.create({
-      data: {
-        clinicaId: consulta.clinicaId,
-        consultaId: consulta.id,
-        pacienteId: consulta.pacienteId,
-        tipo,
-        status: StatusNotificacao.PENDENTE,
-        agendadaPara: new Date(),
-      },
-    });
+    const notificacao = await this.obterOuCriarNotificacao(consulta, tipo);
 
     try {
       const whatsappMessageId = await this.enviarPorTipo(tipo, consulta.paciente.telefone, consulta.dataHoraInicio);
@@ -93,14 +83,19 @@ export class LembretesProcessor extends WorkerHost {
         data: { status: StatusNotificacao.ENVIADA, enviadaEm: new Date(), whatsappMessageId },
       });
     } catch (erro) {
-      this.logger.error(
-        `Falha ao enviar lembrete ${etapa} (notificação ${notificacao.id})`,
-        erro instanceof Error ? erro.stack : String(erro),
-      );
       await this.prisma.notificacao.update({
         where: { id: notificacao.id },
         data: { status: StatusNotificacao.FALHOU, erro: erro instanceof Error ? erro.message : String(erro) },
       });
+      this.logger.error(
+        `Falha ao enviar lembrete ${etapa} (notificação ${notificacao.id}) — repassando ao BullMQ para retry`,
+        erro instanceof Error ? erro.stack : String(erro),
+      );
+      // Relança para o BullMQ tratar como falha do job: com attempts/backoff
+      // definidos ao enfileirar (ConsultasService.agendarLembretes), o próprio
+      // worker reagenda essa tentativa mais tarde e segue livre para processar
+      // os outros jobs da fila enquanto isso — nada aqui bloqueia a fila.
+      throw erro;
     }
 
     if (etapa === 2) {
@@ -127,6 +122,42 @@ export class LembretesProcessor extends WorkerHost {
       default:
         throw new Error(`Tipo de notificação sem envio de WhatsApp mapeado: ${tipo}`);
     }
+  }
+
+  // Numa tentativa de retry, o BullMQ chama process() de novo para o mesmo
+  // job: reaproveita a Notificacao criada na tentativa anterior (em vez de
+  // duplicar o registro) e incrementa `tentativa` — mesmo espírito de
+  // idempotência já usado em NotificacoesService/FilaEsperaService.
+  private async obterOuCriarNotificacao(
+    consulta: { id: string; clinicaId: string; pacienteId: string },
+    tipo: TipoNotificacao,
+  ) {
+    const tentativaAnterior = await this.prisma.notificacao.findFirst({
+      where: {
+        consultaId: consulta.id,
+        tipo,
+        status: { in: [StatusNotificacao.PENDENTE, StatusNotificacao.FALHOU] },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (tentativaAnterior) {
+      return this.prisma.notificacao.update({
+        where: { id: tentativaAnterior.id },
+        data: { status: StatusNotificacao.PENDENTE, erro: null, tentativa: { increment: 1 } },
+      });
+    }
+
+    return this.prisma.notificacao.create({
+      data: {
+        clinicaId: consulta.clinicaId,
+        consultaId: consulta.id,
+        pacienteId: consulta.pacienteId,
+        tipo,
+        status: StatusNotificacao.PENDENTE,
+        agendadaPara: new Date(),
+      },
+    });
   }
 
   private async processarVerificacaoResposta(consultaId: string) {
