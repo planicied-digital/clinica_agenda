@@ -130,34 +130,6 @@ export class NotificacoesService {
     });
   }
 
-  // Régua de lembretes configurável por clínica (seção 6) — etapa 1 (padrão
-  // 48h antes) ou etapa 2 (padrão 2h antes), disparadas pelo LembretesProcessor.
-  async enviarLembrete(params: {
-    clinicaId: string;
-    consultaId: string;
-    pacienteId: string;
-    telefone: string;
-    dataHoraInicio: Date;
-    etapa: 1 | 2;
-  }) {
-    return this.registrarEnvio({
-      clinicaId: params.clinicaId,
-      consultaId: params.consultaId,
-      pacienteId: params.pacienteId,
-      tipo: params.etapa === 1 ? TipoNotificacao.LEMBRETE_1 : TipoNotificacao.LEMBRETE_2,
-      envio: () =>
-        this.whatsappService.enviarBotoes(
-          params.telefone,
-          `Lembrete: você tem consulta em ${formatarDataHora(params.dataHoraInicio)}. Confirma presença?`,
-          [
-            { id: 'CONFIRMAR', titulo: 'Confirmar' },
-            { id: 'CANCELAR', titulo: 'Cancelar' },
-            { id: 'REMARCAR', titulo: 'Remarcar' },
-          ],
-        ),
-    });
-  }
-
   // Oferta de vaga liberada para o próximo da fila de espera (seção 4/6).
   async enviarOfertaFilaEspera(params: {
     clinicaId: string;

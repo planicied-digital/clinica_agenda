@@ -5,6 +5,7 @@ import { LembretesProcessor } from './lembretes/lembretes.processor';
 import { FilaEsperaProcessor } from './fila-espera/fila-espera.processor';
 import { NotificacoesModule } from '../modules/notificacoes/notificacoes.module';
 import { FilaEsperaModule } from '../modules/fila-espera/fila-espera.module';
+import { WhatsappModule } from '../modules/whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { FilaEsperaModule } from '../modules/fila-espera/fila-espera.module';
     BullModule.registerQueue({ name: 'lembretes' }, { name: 'fila-espera' }),
     NotificacoesModule,
     FilaEsperaModule,
+    WhatsappModule,
   ],
   providers: [LembretesProcessor, FilaEsperaProcessor],
 })

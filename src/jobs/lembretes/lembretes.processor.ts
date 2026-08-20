@@ -1,9 +1,11 @@
 import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
-import { StatusConsulta } from '@prisma/client';
+import { StatusConsulta, StatusNotificacao, TipoNotificacao } from '@prisma/client';
 import { Job, Queue } from 'bullmq';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificacoesService } from '../../modules/notificacoes/notificacoes.service';
+import { WhatsappService } from '../../modules/whatsapp/whatsapp.service';
+import { formatarDataHora } from '../../common/utils/data.util';
 
 const STATUS_FINALIZADOS: StatusConsulta[] = [
   StatusConsulta.CANCELADA,
@@ -16,6 +18,15 @@ const STATUS_FINALIZADOS: StatusConsulta[] = [
 // contato manual da secretária (seção 4/6). Sem prazo definido no briefing —
 // valor conservador, ajustável depois (idealmente por clínica).
 const PRAZO_ESCALONAMENTO_MINUTOS = 60;
+
+// Lembretes são mensagens proativas da clínica (seção 6), quase sempre fora
+// da janela de 24h de atendimento desde a última mensagem do paciente — a
+// Cloud API exige um template pré-aprovado nesse caso (texto/botões livres
+// seriam rejeitados pela Meta, ver comentário em WhatsappService.enviarTemplate).
+// Nomes precisam existir como templates aprovados no Meta Business Manager.
+const TEMPLATE_LEMBRETE_1 = 'lembrete_consulta_48h';
+const TEMPLATE_LEMBRETE_2 = 'lembrete_consulta_2h';
+const IDIOMA_TEMPLATE = 'pt_BR';
 
 interface LembreteJobData {
   consultaId: string;
@@ -30,6 +41,7 @@ export class LembretesProcessor extends WorkerHost {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificacoesService: NotificacoesService,
+    private readonly whatsappService: WhatsappService,
     @InjectQueue('lembretes') private readonly lembretesQueue: Queue,
   ) {
     super();
@@ -61,14 +73,35 @@ export class LembretesProcessor extends WorkerHost {
       return; // fluxo manual da secretária, fora da régua automática (seção 4).
     }
 
-    await this.notificacoesService.enviarLembrete({
-      clinicaId: consulta.clinicaId,
-      consultaId: consulta.id,
-      pacienteId: consulta.pacienteId,
-      telefone: consulta.paciente.telefone,
-      dataHoraInicio: consulta.dataHoraInicio,
-      etapa,
+    const tipo = etapa === 1 ? TipoNotificacao.LEMBRETE_1 : TipoNotificacao.LEMBRETE_2;
+
+    const notificacao = await this.prisma.notificacao.create({
+      data: {
+        clinicaId: consulta.clinicaId,
+        consultaId: consulta.id,
+        pacienteId: consulta.pacienteId,
+        tipo,
+        status: StatusNotificacao.PENDENTE,
+        agendadaPara: new Date(),
+      },
     });
+
+    try {
+      const whatsappMessageId = await this.enviarPorTipo(tipo, consulta.paciente.telefone, consulta.dataHoraInicio);
+      await this.prisma.notificacao.update({
+        where: { id: notificacao.id },
+        data: { status: StatusNotificacao.ENVIADA, enviadaEm: new Date(), whatsappMessageId },
+      });
+    } catch (erro) {
+      this.logger.error(
+        `Falha ao enviar lembrete ${etapa} (notificação ${notificacao.id})`,
+        erro instanceof Error ? erro.stack : String(erro),
+      );
+      await this.prisma.notificacao.update({
+        where: { id: notificacao.id },
+        data: { status: StatusNotificacao.FALHOU, erro: erro instanceof Error ? erro.message : String(erro) },
+      });
+    }
 
     if (etapa === 2) {
       await this.lembretesQueue.add(
@@ -76,6 +109,23 @@ export class LembretesProcessor extends WorkerHost {
         { consultaId },
         { delay: PRAZO_ESCALONAMENTO_MINUTOS * 60_000, jobId: `verificar-resposta:${consultaId}` },
       );
+    }
+  }
+
+  // Escolhe o método do WhatsappService conforme o tipo de notificação —
+  // lembretes usam template (proativos, fora da janela de 24h); outros tipos
+  // processados nesta fila poderiam usar texto/botões (sessão ainda aberta),
+  // mas hoje só LEMBRETE_1/LEMBRETE_2 passam por aqui.
+  private enviarPorTipo(tipo: TipoNotificacao, telefone: string, dataHoraInicio: Date): Promise<string | undefined> {
+    const dataFormatada = formatarDataHora(dataHoraInicio);
+
+    switch (tipo) {
+      case TipoNotificacao.LEMBRETE_1:
+        return this.whatsappService.enviarTemplate(telefone, TEMPLATE_LEMBRETE_1, IDIOMA_TEMPLATE, [dataFormatada]);
+      case TipoNotificacao.LEMBRETE_2:
+        return this.whatsappService.enviarTemplate(telefone, TEMPLATE_LEMBRETE_2, IDIOMA_TEMPLATE, [dataFormatada]);
+      default:
+        throw new Error(`Tipo de notificação sem envio de WhatsApp mapeado: ${tipo}`);
     }
   }
 
