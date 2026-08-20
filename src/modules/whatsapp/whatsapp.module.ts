@@ -1,14 +1,12 @@
 import { Module } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
-import { WhatsappWebhookController } from './webhook/whatsapp-webhook.controller';
-import { WhatsappWebhookService } from './webhook/whatsapp-webhook.service';
-import { NotificacoesModule } from '../notificacoes/notificacoes.module';
-import { ConsultasModule } from '../consultas/consultas.module';
 
+// Só o cliente de envio (Cloud API). O webhook de recebimento vive em
+// WhatsappWebhookModule — separado para evitar ciclo de módulos, já que o
+// webhook depende de ConsultasModule/NotificacoesModule e estas, por sua vez,
+// precisam enviar mensagens através deste módulo.
 @Module({
-  imports: [NotificacoesModule, ConsultasModule],
-  controllers: [WhatsappWebhookController],
-  providers: [WhatsappService, WhatsappWebhookService],
+  providers: [WhatsappService],
   exports: [WhatsappService],
 })
 export class WhatsappModule {}

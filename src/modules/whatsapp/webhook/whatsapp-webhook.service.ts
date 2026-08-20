@@ -4,11 +4,16 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { normalizarTelefone } from '../../../common/utils/telefone.util';
 import { NotificacoesService } from '../../notificacoes/notificacoes.service';
 import { ConsultasService } from '../../consultas/consultas.service';
+import { FilaEsperaService } from '../../fila-espera/fila-espera.service';
 
+// CONFIRMAR/ACEITAR_VAGA e CANCELAR/RECUSAR_VAGA mapeiam para a mesma
+// RespostaPaciente — qual dos dois fluxos se aplica (consulta ou oferta de
+// fila de espera) é decidido em processarMensagemRecebida, pela notificação
+// pendente encontrada.
 function interpretarResposta(buttonId?: string, texto?: string): RespostaPaciente {
   const codigo = buttonId?.toUpperCase();
-  if (codigo === 'CONFIRMAR') return RespostaPaciente.CONFIRMOU;
-  if (codigo === 'CANCELAR') return RespostaPaciente.CANCELOU;
+  if (codigo === 'CONFIRMAR' || codigo === 'ACEITAR_VAGA') return RespostaPaciente.CONFIRMOU;
+  if (codigo === 'CANCELAR' || codigo === 'RECUSAR_VAGA') return RespostaPaciente.CANCELOU;
   if (codigo === 'REMARCAR') return RespostaPaciente.PEDIU_REMARCACAO;
 
   const t = (texto ?? '').trim().toLowerCase();
@@ -27,6 +32,7 @@ export class WhatsappWebhookService {
     private readonly prisma: PrismaService,
     private readonly notificacoesService: NotificacoesService,
     private readonly consultasService: ConsultasService,
+    private readonly filaEsperaService: FilaEsperaService,
   ) {}
 
   async processarMensagemRecebida(telefoneOrigem: string, buttonId?: string, texto?: string) {
@@ -45,7 +51,14 @@ export class WhatsappWebhookService {
     );
 
     if (!notificacao) {
-      this.logger.warn(`Nenhuma notificação pendente (ou já respondida) para paciente ${paciente.id}`);
+      // Não há lembrete/confirmação de consulta pendente — pode ser resposta
+      // a uma oferta de vaga da fila de espera (ACEITAR_VAGA/RECUSAR_VAGA).
+      if (resposta === RespostaPaciente.CONFIRMOU || resposta === RespostaPaciente.CANCELOU) {
+        const oferta = await this.filaEsperaService.registrarResposta(paciente.id, resposta === RespostaPaciente.CONFIRMOU);
+        if (!oferta) {
+          this.logger.warn(`Nenhuma notificação ou oferta pendente para paciente ${paciente.id}`);
+        }
+      }
       return;
     }
     if (!notificacao.consultaId) {

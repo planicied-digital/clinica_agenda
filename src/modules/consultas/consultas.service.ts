@@ -1,6 +1,10 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { DiaSemana, Prisma, StatusConsulta, StatusFilaEspera, TipoFilaEspera } from '@prisma/client';
+import { Queue } from 'bullmq';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NotificacoesService } from '../notificacoes/notificacoes.service';
+import { FilaEsperaService } from '../fila-espera/fila-espera.service';
 import { CreateConsultaDto } from './dto/create-consulta.dto';
 import { UpdateConsultaDto } from './dto/update-consulta.dto';
 import { ListConsultasQueryDto } from './dto/list-consultas-query.dto';
@@ -28,13 +32,18 @@ const STATUS_FINALIZADOS: StatusConsulta[] = [
   StatusConsulta.REMARCADA,
 ];
 
-// Tempo que o próximo da fila de espera tem para responder à oferta antes de
-// passarmos para o seguinte. TODO: tornar configurável por clínica.
-const EXPIRACAO_OFERTA_FILA_MINUTOS = 30;
+// Prioridade dada às reservas de retorno na fila de espera (seção 5 — "parte
+// das vagas do médico fica reservada para retornos, prioridade de agenda").
+const PRIORIDADE_RETORNO = 10;
 
 @Injectable()
 export class ConsultasService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificacoesService: NotificacoesService,
+    private readonly filaEsperaService: FilaEsperaService,
+    @InjectQueue('lembretes') private readonly lembretesQueue: Queue,
+  ) {}
 
   async create(dto: CreateConsultaDto) {
     const medico = await this.prisma.medico.findUnique({ where: { id: dto.medicoId } });
@@ -87,9 +96,23 @@ export class ConsultasService {
       },
     });
 
-    // TODO: disparar CONFIRMACAO_SOLICITACAO (paciente com WhatsApp) ou
-    // ALERTA_SECRETARIA (paciente sem WhatsApp) quando o módulo de
-    // notificações/whatsapp existir.
+    if (paciente.temWhatsapp) {
+      await this.notificacoesService.enviarConfirmacaoSolicitacao({
+        clinicaId: consulta.clinicaId,
+        consultaId: consulta.id,
+        pacienteId: consulta.pacienteId,
+        telefone: paciente.telefone,
+        dataHoraInicio: consulta.dataHoraInicio,
+      });
+      await this.agendarLembretes(consulta);
+    } else {
+      await this.notificacoesService.enviarAlertaSecretaria({
+        clinicaId: consulta.clinicaId,
+        consultaId: consulta.id,
+        pacienteId: consulta.pacienteId,
+        motivo: 'Paciente sem WhatsApp — contato manual necessário',
+      });
+    }
 
     return consulta;
   }
@@ -155,7 +178,13 @@ export class ConsultasService {
       },
     });
 
-    await this.acionarFilaDeEspera(atualizada);
+    await this.cancelarLembretesPendentes(id);
+    await this.filaEsperaService.ofertarProximo({
+      consultaId: atualizada.id,
+      clinicaId: atualizada.clinicaId,
+      medicoId: atualizada.medicoId,
+      dataHoraInicio: atualizada.dataHoraInicio,
+    });
     return atualizada;
   }
 
@@ -200,8 +229,26 @@ export class ConsultasService {
       return criada;
     });
 
-    // Libera o horário antigo para a fila de espera (mesma lógica do cancelamento — seção 4).
-    await this.acionarFilaDeEspera(consultaAntiga);
+    await this.cancelarLembretesPendentes(consultaAntiga.id);
+
+    if (consultaAntiga.paciente.temWhatsapp) {
+      await this.notificacoesService.enviarRemarcacao({
+        clinicaId: novaConsulta.clinicaId,
+        consultaId: novaConsulta.id,
+        pacienteId: novaConsulta.pacienteId,
+        telefone: consultaAntiga.paciente.telefone,
+        dataHoraInicio: novaConsulta.dataHoraInicio,
+      });
+      await this.agendarLembretes(novaConsulta);
+    }
+
+    // Libera o horário antigo para a fila de espera (mesma lógica do cancelamento — seção 4/6).
+    await this.filaEsperaService.ofertarProximo({
+      consultaId: consultaAntiga.id,
+      clinicaId: consultaAntiga.clinicaId,
+      medicoId: consultaAntiga.medicoId,
+      dataHoraInicio: consultaAntiga.dataHoraInicio,
+    });
 
     return novaConsulta;
   }
@@ -245,9 +292,31 @@ export class ConsultasService {
       },
     });
 
-    // TODO: oferecer horário dentro da janela no ato e, se não houver vaga,
-    // criar FilaDeEspera tipo JANELA_PERIODO prioritária (seção 5) — depende
-    // do módulo de fila de espera dedicado, ainda não implementado.
+    // Reserva prioritária na fila de espera para a janela de retorno (seção 5/6).
+    // Oferecer o horário no ato é responsabilidade do painel/frontend (ainda
+    // não existe) usando GET /consultas/disponibilidade; aqui garantimos que o
+    // paciente não se perca caso isso não aconteça antes de sair da clínica.
+    // JANELA_PERIODO não é repassada automaticamente como VAGA_ESPECIFICA —
+    // não há um horário específico para oferecer, só a janela recomendada.
+    await this.prisma.filaDeEspera.create({
+      data: {
+        clinicaId: atualizada.clinicaId,
+        medicoId: atualizada.medicoId,
+        pacienteId: atualizada.pacienteId,
+        tipo: TipoFilaEspera.JANELA_PERIODO,
+        janelaInicio: retornoJanelaInicio,
+        janelaFim: retornoJanelaFim,
+        prioridade: PRIORIDADE_RETORNO,
+        status: StatusFilaEspera.AGUARDANDO,
+      },
+    });
+
+    await this.notificacoesService.enviarAlertaSecretaria({
+      clinicaId: atualizada.clinicaId,
+      consultaId: atualizada.id,
+      pacienteId: atualizada.pacienteId,
+      motivo: 'Retorno registrado — acompanhar agendamento dentro da janela recomendada',
+    });
 
     return atualizada;
   }
@@ -370,41 +439,36 @@ export class ConsultasService {
     }
   }
 
-  // Notifica o próximo paciente da fila de espera do médico quando uma vaga
-  // é liberada por cancelamento ou remarcação (seção 4/6).
-  private async acionarFilaDeEspera(consultaLiberada: {
-    id: string;
-    clinicaId: string;
-    medicoId: string;
-    dataHoraInicio: Date;
-  }) {
-    const proximo = await this.prisma.filaDeEspera.findFirst({
-      where: {
-        clinicaId: consultaLiberada.clinicaId,
-        medicoId: consultaLiberada.medicoId,
-        tipo: TipoFilaEspera.VAGA_ESPECIFICA,
-        status: StatusFilaEspera.AGUARDANDO,
-      },
-      orderBy: [{ prioridade: 'desc' }, { createdAt: 'asc' }],
-    });
-
-    if (!proximo) {
+  // Agenda a régua de lembretes configurável por clínica (seção 6 — padrão
+  // 48h/2h antes). jobId estável por etapa+consulta: reagendar a mesma
+  // consulta não duplica o job, e cancelarLembretesPendentes sabe como achá-lo.
+  private async agendarLembretes(consulta: { id: string; clinicaId: string; dataHoraInicio: Date }) {
+    const clinica = await this.prisma.clinica.findUnique({ where: { id: consulta.clinicaId } });
+    if (!clinica) {
       return;
     }
 
-    await this.prisma.filaDeEspera.update({
-      where: { id: proximo.id },
-      data: {
-        status: StatusFilaEspera.NOTIFICADO,
-        consultaVagaId: consultaLiberada.id,
-        dataHoraSlot: consultaLiberada.dataHoraInicio,
-        notificadoEm: new Date(),
-        expiraEm: new Date(Date.now() + EXPIRACAO_OFERTA_FILA_MINUTOS * 60_000),
-      },
-    });
+    const agendarEtapa = async (jobName: 'lembrete1' | 'lembrete2', horasAntes: number) => {
+      const delay = consulta.dataHoraInicio.getTime() - Date.now() - horasAntes * 3_600_000;
+      if (delay <= 0) {
+        return; // consulta marcada em cima da hora — pula essa etapa da régua.
+      }
+      await this.lembretesQueue.add(jobName, { consultaId: consulta.id }, { delay, jobId: `${jobName}:${consulta.id}` });
+    };
 
-    // TODO: disparo real da oferta via WhatsApp quando o módulo existir; e um
-    // job (fila `fila-espera`, já registrada) para expirar e passar adiante
-    // se o paciente não responder dentro de EXPIRACAO_OFERTA_FILA_MINUTOS.
+    await agendarEtapa('lembrete1', clinica.reguaLembrete1Horas);
+    await agendarEtapa('lembrete2', clinica.reguaLembrete2Horas);
+  }
+
+  // Remove jobs de lembrete/escalonamento pendentes de uma consulta que não
+  // precisa mais deles (cancelada ou remarcada para outro horário).
+  private async cancelarLembretesPendentes(consultaId: string) {
+    const jobIds = ['lembrete1', 'lembrete2', 'verificar-resposta'].map((etapa) => `${etapa}:${consultaId}`);
+    await Promise.all(
+      jobIds.map(async (jobId) => {
+        const job = await this.lembretesQueue.getJob(jobId);
+        await job?.remove();
+      }),
+    );
   }
 }

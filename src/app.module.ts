@@ -16,6 +16,7 @@ import { ConsultasModule } from './modules/consultas/consultas.module';
 import { FilaEsperaModule } from './modules/fila-espera/fila-espera.module';
 import { NotificacoesModule } from './modules/notificacoes/notificacoes.module';
 import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
+import { WhatsappWebhookModule } from './modules/whatsapp/webhook/whatsapp-webhook.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
     FilaEsperaModule,
     NotificacoesModule,
     WhatsappModule,
+    WhatsappWebhookModule,
   ],
 })
 export class AppModule {}

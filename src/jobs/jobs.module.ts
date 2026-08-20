@@ -3,6 +3,8 @@ import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LembretesProcessor } from './lembretes/lembretes.processor';
 import { FilaEsperaProcessor } from './fila-espera/fila-espera.processor';
+import { NotificacoesModule } from '../modules/notificacoes/notificacoes.module';
+import { FilaEsperaModule } from '../modules/fila-espera/fila-espera.module';
 
 @Module({
   imports: [
@@ -18,8 +20,9 @@ import { FilaEsperaProcessor } from './fila-espera/fila-espera.processor';
       }),
     }),
     BullModule.registerQueue({ name: 'lembretes' }, { name: 'fila-espera' }),
+    NotificacoesModule,
+    FilaEsperaModule,
   ],
   providers: [LembretesProcessor, FilaEsperaProcessor],
-  exports: [BullModule],
 })
 export class JobsModule {}
