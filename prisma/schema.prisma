@@ -1,0 +1,483 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum PapelUsuario {
+  ADMIN
+  SECRETARIA
+  MEDICO
+}
+
+enum StatusConsulta {
+  SOLICITADA
+  AGUARDANDO_CONFIRMACAO
+  CONFIRMADA
+  CANCELADA
+  REMARCADA
+  REALIZADA
+  NAO_COMPARECEU
+}
+
+enum OrigemConsulta {
+  PACIENTE_NOVO
+  PACIENTE_ANTIGO
+  RETORNO
+  SECRETARIA
+}
+
+enum TipoFilaEspera {
+  VAGA_ESPECIFICA
+  JANELA_PERIODO
+}
+
+enum StatusFilaEspera {
+  AGUARDANDO
+  NOTIFICADO
+  ACEITO
+  RECUSADO
+  EXPIRADO
+  CANCELADO
+}
+
+enum CanalNotificacao {
+  WHATSAPP
+}
+
+enum TipoNotificacao {
+  CONFIRMACAO_SOLICITACAO
+  LEMBRETE_1
+  LEMBRETE_2
+  ALERTA_SECRETARIA
+  FILA_ESPERA_OFERTA
+  LEMBRETE_RETORNO
+  CANCELAMENTO
+  REMARCACAO
+}
+
+enum StatusNotificacao {
+  PENDENTE
+  ENFILEIRADA
+  ENVIADA
+  ENTREGUE
+  LIDA
+  RESPONDIDA
+  FALHOU
+  EXPIRADA
+}
+
+enum RespostaPaciente {
+  CONFIRMOU
+  CANCELOU
+  PEDIU_REMARCACAO
+  SEM_RESPOSTA
+}
+
+enum DiaSemana {
+  DOMINGO
+  SEGUNDA
+  TERCA
+  QUARTA
+  QUINTA
+  SEXTA
+  SABADO
+}
+
+enum TipoBloqueio {
+  FERIADO
+  FERIAS
+  LICENCA
+  EVENTO
+  BLOQUEIO_PONTUAL
+}
+
+// ---------------------------------------------------------------------------
+// Clínica
+// ---------------------------------------------------------------------------
+
+model Clinica {
+  id        String   @id @default(cuid())
+  nome      String
+  cnpj      String?  @unique
+  telefone  String?
+  endereco  String?
+  timezone  String   @default("America/Sao_Paulo")
+
+  // Régua de lembretes configurável (seção 6) — horas antes da consulta.
+  reguaLembrete1Horas Int @default(48)
+  reguaLembrete2Horas Int @default(2)
+
+  ativa     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  usuarios      Usuario[]
+  medicos       Medico[]
+  pacientes     Paciente[]
+  tiposConsulta TipoConsulta[]
+  consultas     Consulta[]
+  filaDeEspera  FilaDeEspera[]
+  notificacoes  Notificacao[]
+  salas         Sala[]
+  bloqueios     Bloqueio[]
+  horariosAtendimento HorarioAtendimento[]
+
+  @@map("clinicas")
+}
+
+// ---------------------------------------------------------------------------
+// Usuário (login do painel — secretária / médico / admin)
+// ---------------------------------------------------------------------------
+
+model Usuario {
+  id        String       @id @default(cuid())
+  clinicaId String
+  clinica   Clinica      @relation(fields: [clinicaId], references: [id])
+
+  nome      String
+  email     String
+  senhaHash String
+  papel     PapelUsuario
+
+  // Vínculo opcional: só usuários com papel MEDICO apontam para um Medico.
+  medicoId  String?      @unique
+  medico    Medico?      @relation(fields: [medicoId], references: [id])
+
+  ativo     Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([clinicaId, email])
+  @@index([clinicaId])
+  @@map("usuarios")
+}
+
+// ---------------------------------------------------------------------------
+// Médico
+// ---------------------------------------------------------------------------
+
+model Medico {
+  id            String   @id @default(cuid())
+  clinicaId     String
+  clinica       Clinica  @relation(fields: [clinicaId], references: [id])
+
+  nome          String
+  especialidade String
+  crm           String?
+  telefone      String?
+  ativo         Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  usuario            Usuario?
+  consultas          Consulta[]
+  filaDeEspera       FilaDeEspera[]
+  tiposConsulta      TipoConsulta[]
+  pacientesHabituais Paciente[]           @relation("MedicoHabitual")
+  horariosAtendimento HorarioAtendimento[]
+  bloqueios          Bloqueio[]
+
+  @@index([clinicaId])
+  @@map("medicos")
+}
+
+// ---------------------------------------------------------------------------
+// Tipo de consulta (duração padrão por tipo — seção 3, item 1)
+// ---------------------------------------------------------------------------
+
+model TipoConsulta {
+  id        String   @id @default(cuid())
+  clinicaId String
+  clinica   Clinica  @relation(fields: [clinicaId], references: [id])
+
+  // Nulo = tipo genérico disponível para qualquer médico da clínica.
+  medicoId  String?
+  medico    Medico?  @relation(fields: [medicoId], references: [id])
+
+  nome            String
+  duracaoMinutos  Int
+  cor             String?
+  ativo           Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  consultas Consulta[]
+
+  @@index([clinicaId])
+  @@map("tipos_consulta")
+}
+
+// ---------------------------------------------------------------------------
+// Paciente
+// ---------------------------------------------------------------------------
+
+model Paciente {
+  id            String    @id @default(cuid())
+  clinicaId     String
+  clinica       Clinica   @relation(fields: [clinicaId], references: [id])
+
+  nome          String
+  dataNascimento DateTime?
+  telefone      String
+  cpf           String?
+  convenio      String?
+  temWhatsapp   Boolean   @default(true)
+  observacoes   String?
+
+  // Médico de preferência do paciente (seção 5 — "paciente antigo").
+  medicoHabitualId String?
+  medicoHabitual   Medico? @relation("MedicoHabitual", fields: [medicoHabitualId], references: [id])
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  consultas    Consulta[]
+  filaDeEspera FilaDeEspera[]
+  notificacoes Notificacao[]
+
+  // Reconhecimento automático por telefone/CPF (seção 5) dentro da clínica.
+  @@unique([clinicaId, telefone])
+  @@unique([clinicaId, cpf])
+  @@index([clinicaId])
+  @@map("pacientes")
+}
+
+// ---------------------------------------------------------------------------
+// Consulta
+// ---------------------------------------------------------------------------
+
+model Consulta {
+  id        String   @id @default(cuid())
+  clinicaId String
+  clinica   Clinica  @relation(fields: [clinicaId], references: [id])
+
+  medicoId  String
+  medico    Medico   @relation(fields: [medicoId], references: [id])
+
+  pacienteId String
+  paciente   Paciente @relation(fields: [pacienteId], references: [id])
+
+  tipoConsultaId String?
+  tipoConsulta   TipoConsulta? @relation(fields: [tipoConsultaId], references: [id])
+
+  salaId String?
+  sala   Sala?   @relation(fields: [salaId], references: [id])
+
+  dataHoraInicio DateTime
+  dataHoraFim    DateTime
+
+  status  StatusConsulta @default(SOLICITADA)
+  origem  OrigemConsulta
+
+  motivo      String?
+  observacoes String?
+
+  motivoCancelamento String?
+  canceladaEm        DateTime?
+
+  // Remarcação: aponta para a consulta anterior que originou esta (seção 4).
+  remarcadaDeId String?    @unique
+  remarcadaDe   Consulta?  @relation("Remarcacao", fields: [remarcadaDeId], references: [id])
+  remarcadaPara Consulta?  @relation("Remarcacao")
+
+  // Retorno (seção 5): janela clínica recomendada e vínculo com a consulta de origem.
+  necessitaRetorno     Boolean   @default(false)
+  retornoPrazoDiasMin  Int?
+  retornoPrazoDiasMax  Int?
+  retornoJanelaInicio  DateTime?
+  retornoJanelaFim     DateTime?
+
+  consultaOrigemId String?
+  consultaOrigem   Consulta?  @relation("Retorno", fields: [consultaOrigemId], references: [id])
+  retornos         Consulta[] @relation("Retorno")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  filaDeEspera FilaDeEspera[]
+  notificacoes Notificacao[]
+
+  @@index([clinicaId])
+  @@index([medicoId, dataHoraInicio])
+  @@index([pacienteId])
+  @@index([status])
+  @@map("consultas")
+}
+
+// ---------------------------------------------------------------------------
+// Fila de espera
+// ---------------------------------------------------------------------------
+
+model FilaDeEspera {
+  id        String  @id @default(cuid())
+  clinicaId String
+  clinica   Clinica @relation(fields: [clinicaId], references: [id])
+
+  medicoId  String
+  medico    Medico  @relation(fields: [medicoId], references: [id])
+
+  pacienteId String
+  paciente   Paciente @relation(fields: [pacienteId], references: [id])
+
+  tipo TipoFilaEspera
+
+  // Preenchido quando tipo = VAGA_ESPECIFICA: a consulta cujo horário foi liberado.
+  consultaVagaId String?
+  consultaVaga    Consulta? @relation(fields: [consultaVagaId], references: [id])
+  dataHoraSlot    DateTime?
+
+  // Preenchido quando tipo = JANELA_PERIODO (ex.: fila prioritária de retorno).
+  janelaInicio DateTime?
+  janelaFim    DateTime?
+
+  prioridade Int              @default(0)
+  status     StatusFilaEspera @default(AGUARDANDO)
+
+  notificadoEm DateTime?
+  expiraEm     DateTime?
+  respondidoEm DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clinicaId])
+  @@index([medicoId, status])
+  @@index([pacienteId])
+  @@map("fila_de_espera")
+}
+
+// ---------------------------------------------------------------------------
+// Notificação
+// ---------------------------------------------------------------------------
+
+model Notificacao {
+  id        String  @id @default(cuid())
+  clinicaId String
+  clinica   Clinica @relation(fields: [clinicaId], references: [id])
+
+  consultaId String?
+  consulta   Consulta? @relation(fields: [consultaId], references: [id])
+
+  pacienteId String
+  paciente   Paciente @relation(fields: [pacienteId], references: [id])
+
+  canal CanalNotificacao @default(WHATSAPP)
+  tipo  TipoNotificacao
+
+  status StatusNotificacao @default(PENDENTE)
+
+  agendadaPara DateTime
+  enviadaEm    DateTime?
+  entregueEm   DateTime?
+  respondidaEm DateTime?
+
+  respostaPaciente      RespostaPaciente?
+  respostaTextoBruto    String?
+
+  // Idempotência de webhook (seção 8 — requisito não funcional).
+  whatsappMessageId String? @unique
+
+  tentativa Int     @default(1)
+  erro      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clinicaId])
+  @@index([consultaId])
+  @@index([pacienteId])
+  @@index([status, agendadaPara])
+  @@map("notificacoes")
+}
+
+// ---------------------------------------------------------------------------
+// Sala
+// ---------------------------------------------------------------------------
+
+model Sala {
+  id        String  @id @default(cuid())
+  clinicaId String
+  clinica   Clinica @relation(fields: [clinicaId], references: [id])
+
+  nome      String
+  descricao String?
+  ativa     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  consultas Consulta[]
+  bloqueios Bloqueio[]
+
+  @@unique([clinicaId, nome])
+  @@index([clinicaId])
+  @@map("salas")
+}
+
+// ---------------------------------------------------------------------------
+// Horário de atendimento (agenda recorrente semanal de um médico)
+// ---------------------------------------------------------------------------
+
+model HorarioAtendimento {
+  id        String  @id @default(cuid())
+  clinicaId String
+  clinica   Clinica @relation(fields: [clinicaId], references: [id])
+  medicoId  String
+  medico    Medico  @relation(fields: [medicoId], references: [id])
+
+  diaSemana DiaSemana
+
+  // Minutos desde 00:00 — evita ambiguidade de timezone/tipo Time entre bancos.
+  horaInicioMinutos Int
+  horaFimMinutos    Int
+
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clinicaId])
+  @@index([medicoId, diaSemana])
+  @@map("horarios_atendimento")
+}
+
+// ---------------------------------------------------------------------------
+// Bloqueio (feriados, férias, licenças, eventos pontuais)
+// ---------------------------------------------------------------------------
+
+model Bloqueio {
+  id        String  @id @default(cuid())
+  clinicaId String
+  clinica   Clinica @relation(fields: [clinicaId], references: [id])
+
+  // Nulo = bloqueio vale para a clínica inteira (ex.: feriado nacional).
+  medicoId String?
+  medico   Medico? @relation(fields: [medicoId], references: [id])
+
+  // Nulo = bloqueio não é restrito a uma sala específica.
+  salaId String?
+  sala   Sala?   @relation(fields: [salaId], references: [id])
+
+  tipo        TipoBloqueio
+  titulo      String
+  descricao   String?
+
+  dataHoraInicio DateTime
+  dataHoraFim    DateTime
+  diaInteiro     Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clinicaId])
+  @@index([medicoId, dataHoraInicio])
+  @@index([salaId])
+  @@map("bloqueios")
+}
