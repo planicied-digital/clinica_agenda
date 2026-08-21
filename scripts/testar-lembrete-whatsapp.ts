@@ -86,7 +86,7 @@ async function main() {
     const job = await lembretesQueue.add(
       'lembrete1',
       { consultaId: consulta.id },
-      { delay: 0, jobId: `teste-manual:${consulta.id}`, attempts: 3, backoff: { type: 'exponential', delay: 60_000 } },
+      { delay: 0, jobId: `teste-manual-${consulta.id}`, attempts: 3, backoff: { type: 'exponential', delay: 60_000 } },
     );
     console.log('Job enfileirado — id:', job.id, '(acompanhe os logs do LembretesProcessor acima/abaixo)');
 

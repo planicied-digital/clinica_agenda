@@ -102,7 +102,7 @@ export class LembretesProcessor extends WorkerHost {
       await this.lembretesQueue.add(
         'verificar-resposta',
         { consultaId },
-        { delay: PRAZO_ESCALONAMENTO_MINUTOS * 60_000, jobId: `verificar-resposta:${consultaId}` },
+        { delay: PRAZO_ESCALONAMENTO_MINUTOS * 60_000, jobId: `verificar-resposta-${consultaId}` },
       );
     }
   }

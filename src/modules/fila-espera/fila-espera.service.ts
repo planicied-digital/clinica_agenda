@@ -67,7 +67,7 @@ export class FilaEsperaService {
     await this.filaEsperaQueue.add(
       'expirar-oferta',
       { filaEsperaId: atualizado.id },
-      { delay: EXPIRACAO_OFERTA_FILA_MINUTOS * 60_000, jobId: `expirar-oferta:${atualizado.id}` },
+      { delay: EXPIRACAO_OFERTA_FILA_MINUTOS * 60_000, jobId: `expirar-oferta-${atualizado.id}` },
     );
 
     return atualizado;

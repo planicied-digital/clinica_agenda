@@ -466,7 +466,7 @@ export class ConsultasService {
         { consultaId: consulta.id },
         {
           delay,
-          jobId: `${jobName}:${consulta.id}`,
+          jobId: `${jobName}-${consulta.id}`,
           attempts: TENTATIVAS_ENVIO_LEMBRETE,
           backoff: { type: 'exponential', delay: BACKOFF_INICIAL_LEMBRETE_MS },
         },
@@ -480,7 +480,7 @@ export class ConsultasService {
   // Remove jobs de lembrete/escalonamento pendentes de uma consulta que não
   // precisa mais deles (cancelada ou remarcada para outro horário).
   private async cancelarLembretesPendentes(consultaId: string) {
-    const jobIds = ['lembrete1', 'lembrete2', 'verificar-resposta'].map((etapa) => `${etapa}:${consultaId}`);
+    const jobIds = ['lembrete1', 'lembrete2', 'verificar-resposta'].map((etapa) => `${etapa}-${consultaId}`);
     await Promise.all(
       jobIds.map(async (jobId) => {
         const job = await this.lembretesQueue.getJob(jobId);
