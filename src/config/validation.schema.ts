@@ -17,4 +17,5 @@ export const validationSchema = Joi.object({
   WHATSAPP_PHONE_NUMBER_ID: Joi.string().allow('').optional(),
   WHATSAPP_ACCESS_TOKEN: Joi.string().allow('').optional(),
   WHATSAPP_WEBHOOK_VERIFY_TOKEN: Joi.string().allow('').optional(),
+  WHATSAPP_APP_SECRET: Joi.string().allow('').optional(),
 });

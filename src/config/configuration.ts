@@ -18,5 +18,8 @@ export default () => ({
     phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID,
     accessToken: process.env.WHATSAPP_ACCESS_TOKEN,
     webhookVerifyToken: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN,
+    // App Secret (não o access token) — usado só pra validar a assinatura
+    // HMAC do webhook (X-Hub-Signature-256), nunca enviado à Meta.
+    appSecret: process.env.WHATSAPP_APP_SECRET,
   },
 });

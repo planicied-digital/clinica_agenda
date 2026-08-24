@@ -1,6 +1,8 @@
-import { Body, Controller, Get, Logger, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Post, Query, Req, Res, UnauthorizedException } from '@nestjs/common';
+import type { RawBodyRequest } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Response } from 'express';
+import type { Response, Request } from 'express';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { WhatsappWebhookService } from './whatsapp-webhook.service';
 import { Public } from '../../../common/auth/public.decorator';
 
@@ -55,7 +57,13 @@ export class WhatsappWebhookController {
   }
 
   @Post()
-  async receber(@Body() payload: WhatsappWebhookPayload, @Res() res: Response) {
+  async receber(
+    @Body() payload: WhatsappWebhookPayload,
+    @Req() req: RawBodyRequest<Request>,
+    @Res() res: Response,
+  ) {
+    this.assertAssinaturaValida(req);
+
     // Responde 200 sempre (mesmo em erro de processamento) para evitar que a
     // Meta re-envie o mesmo evento em loop agressivo de retry; falhas ficam
     // registradas no log para investigação manual.
@@ -81,5 +89,34 @@ export class WhatsappWebhookController {
     }
 
     res.status(200).send('EVENT_RECEIVED');
+  }
+
+  // Confirma que o POST veio mesmo da Meta (assinatura HMAC-SHA256 do corpo
+  // bruto, com o App Secret como chave — ver main.ts para o rawBody e
+  // assert-production-config.ts, que exige WHATSAPP_APP_SECRET em produção).
+  // Sem isso, qualquer um poderia forjar "o paciente confirmou/cancelou".
+  private assertAssinaturaValida(req: RawBodyRequest<Request>): void {
+    const appSecret = this.config.get<string>('whatsapp.appSecret');
+    if (!appSecret) {
+      // Só chega aqui em dev/test — produção recusa subir sem o segredo.
+      return;
+    }
+
+    const assinaturaRecebida = req.headers['x-hub-signature-256'];
+    if (typeof assinaturaRecebida !== 'string' || !req.rawBody) {
+      throw new UnauthorizedException('Assinatura do webhook ausente');
+    }
+
+    const assinaturaEsperada =
+      'sha256=' + createHmac('sha256', appSecret).update(req.rawBody).digest('hex');
+
+    const bufferRecebido = Buffer.from(assinaturaRecebida);
+    const bufferEsperado = Buffer.from(assinaturaEsperada);
+    const valida =
+      bufferRecebido.length === bufferEsperado.length && timingSafeEqual(bufferRecebido, bufferEsperado);
+
+    if (!valida) {
+      throw new UnauthorizedException('Assinatura do webhook inválida');
+    }
   }
 }
