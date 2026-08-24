@@ -53,12 +53,16 @@ button.botao-secundario:hover:not(:disabled) {
   background: var(--cor-fundo);
 }
 
-input {
+input,
+select {
   padding: 8px 10px;
   border: 1px solid var(--cor-borda);
   border-radius: var(--raio);
   font-size: 14px;
   margin-bottom: 14px;
+  background: white;
+  color: var(--cor-texto);
+  font-family: inherit;
 }
 
 label {
@@ -312,5 +316,90 @@ label {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  font-size: 14px;
+}
+
+.form-nova-consulta {
+  max-width: 420px;
+}
+
+.secao-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.linha-busca {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.linha-busca input {
+  flex: 1;
+}
+
+.cartao-cadastro-rapido {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  display: flex;
+  flex-direction: column;
+}
+
+.linha-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.linha-checkbox input {
+  margin: 0;
+  width: auto;
+}
+
+.linha-paciente-selecionado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.secao-horarios {
+  margin-bottom: 14px;
+}
+
+.grade-horarios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.botao-horario {
+  background: white;
+  color: var(--cor-texto);
+  border: 1px solid var(--cor-borda);
+  padding: 6px 12px;
+}
+
+.botao-horario:hover:not(:disabled) {
+  border-color: var(--cor-primaria);
+}
+
+.botao-horario.horario-selecionado {
+  background: var(--cor-primaria);
+  color: white;
+  border-color: var(--cor-primaria);
+}
+
+.mensagem-sucesso {
+  background: #e5f6ea;
+  color: #1e8a3c;
+  border: 1px solid #bfe6c8;
+  border-radius: var(--raio);
+  padding: 12px 14px;
   font-size: 14px;
 }

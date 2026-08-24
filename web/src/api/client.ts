@@ -31,10 +31,14 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
     throw new ApiError(corpo.message ?? `Erro ${resposta.status}`, resposta.status);
   }
 
-  if (resposta.status === 204) {
-    return undefined as T;
+  // NestJS não serializa um corpo "null" pra handlers que retornam null (ex.:
+  // busca sem resultado) — o corpo vem vazio (também o caso de 204), não a
+  // string "null", e resposta.json() quebra em SyntaxError nesse caso.
+  const texto = await resposta.text();
+  if (!texto) {
+    return null as T;
   }
-  return resposta.json() as Promise<T>;
+  return JSON.parse(texto) as T;
 }
 
 export const api = {
