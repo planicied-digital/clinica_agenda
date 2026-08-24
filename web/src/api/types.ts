@@ -62,8 +62,11 @@ export interface Consulta {
   dataHoraFim: string;
   status: StatusConsulta;
   motivo: string | null;
+  observacoes: string | null;
   paciente: Paciente;
   medico: Medico;
+  tipoConsulta: TipoConsulta | null;
+  sala: Sala | null;
 }
 
 export interface Notificacao {

@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { api, ApiError } from '../api/client';
 import type { Medico, Paciente, Sala, SlotDisponivel, TipoConsulta } from '../api/types';
-import { hoje, formatarHora } from '../utils/data';
+import { hoje } from '../utils/data';
+import { useDisponibilidade } from '../hooks/useDisponibilidade';
+import { SeletorDeHorario } from './SeletorDeHorario';
 
 interface NovoPacienteForm {
   nome: string;
@@ -35,9 +37,12 @@ export function NovaConsulta({ onCriada }: { onCriada: () => void }) {
   const [data, setData] = useState(hoje());
   const [salas, setSalas] = useState<Sala[]>([]);
   const [salaId, setSalaId] = useState('');
-  const [horarios, setHorarios] = useState<SlotDisponivel[] | null>(null);
-  const [carregandoHorarios, setCarregandoHorarios] = useState(false);
   const [horarioSelecionado, setHorarioSelecionado] = useState<SlotDisponivel | null>(null);
+  const { horarios, carregando: carregandoHorarios, recarregar: recarregarHorarios } = useDisponibilidade({
+    medicoId,
+    tipoConsultaId,
+    data,
+  });
   const [motivo, setMotivo] = useState('');
   const [observacoes, setObservacoes] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -70,26 +75,13 @@ export function NovaConsulta({ onCriada }: { onCriada: () => void }) {
       .then(setTiposConsulta)
       .catch(() => setTiposConsulta([]));
     setTipoConsultaId('');
-    setHorarios(null);
-    setHorarioSelecionado(null);
   }, [sessao, clinicaId, medicoId]);
 
+  // Troca de médico/tipo/data invalida a escolha anterior — useDisponibilidade
+  // já recarrega a lista sozinho, só precisamos limpar a seleção.
   useEffect(() => {
     setHorarioSelecionado(null);
-    if (!sessao || !medicoId || !tipoConsultaId || !data) {
-      setHorarios(null);
-      return;
-    }
-    setCarregandoHorarios(true);
-    api
-      .get<SlotDisponivel[]>(
-        `/consultas/disponibilidade?medicoId=${medicoId}&tipoConsultaId=${tipoConsultaId}&data=${data}`,
-        sessao.accessToken,
-      )
-      .then(setHorarios)
-      .catch(() => setHorarios([]))
-      .finally(() => setCarregandoHorarios(false));
-  }, [sessao, medicoId, tipoConsultaId, data]);
+  }, [medicoId, tipoConsultaId, data]);
 
   async function buscarPaciente() {
     if (!sessao || !contato.trim()) return;
@@ -174,13 +166,7 @@ export function NovaConsulta({ onCriada }: { onCriada: () => void }) {
       if (e instanceof ApiError && e.status === 409) {
         setErroEnvio('Esse horário acabou de ser ocupado por outra marcação. Escolha outro horário na lista abaixo.');
         setHorarioSelecionado(null);
-        api
-          .get<SlotDisponivel[]>(
-            `/consultas/disponibilidade?medicoId=${medicoId}&tipoConsultaId=${tipoConsultaId}&data=${data}`,
-            sessao.accessToken,
-          )
-          .then(setHorarios)
-          .catch(() => setHorarios([]));
+        recarregarHorarios();
       } else {
         setErroEnvio(e instanceof ApiError ? e.message : 'Falha ao criar a consulta.');
       }
@@ -307,26 +293,12 @@ export function NovaConsulta({ onCriada }: { onCriada: () => void }) {
             {tipoConsultaId && data && (
               <div className="secao-horarios">
                 <label>Horário</label>
-                {carregandoHorarios ? (
-                  <p className="texto-suave">Carregando horários…</p>
-                ) : !horarios || horarios.length === 0 ? (
-                  <p className="texto-suave">Nenhum horário disponível nessa data.</p>
-                ) : (
-                  <div className="grade-horarios">
-                    {horarios.map((h) => (
-                      <button
-                        key={h.inicio}
-                        type="button"
-                        className={
-                          horarioSelecionado?.inicio === h.inicio ? 'botao-horario horario-selecionado' : 'botao-horario'
-                        }
-                        onClick={() => setHorarioSelecionado(h)}
-                      >
-                        {formatarHora(h.inicio)}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <SeletorDeHorario
+                  horarios={horarios}
+                  carregando={carregandoHorarios}
+                  selecionado={horarioSelecionado}
+                  onSelecionar={setHorarioSelecionado}
+                />
               </div>
             )}
 

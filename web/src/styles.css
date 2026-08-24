@@ -403,3 +403,14 @@ label {
   padding: 12px 14px;
   font-size: 14px;
 }
+
+.painel-inline {
+  background: var(--cor-fundo);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  padding: 16px;
+  margin: 4px 0;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+}
