@@ -18,7 +18,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "testar:lembrete-whatsapp": "ts-node scripts/testar-lembrete-whatsapp.ts",
-    "criar:usuario-admin": "ts-node scripts/criar-usuario-admin.ts"
+    "criar:usuario-admin": "ts-node scripts/criar-usuario-admin.ts",
+    "seed:dados-teste": "ts-node scripts/seed-dados-teste.ts"
   },
   "dependencies": {
     "@nestjs/bullmq": "^10.2.0",
