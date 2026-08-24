@@ -11,6 +11,7 @@ type PainelAberto = { consultaId: string; modo: 'remarcar' | 'editar' } | null;
 
 export function AgendaHoje() {
   const { sessao } = useAuth();
+  const [data, setData] = useState(hoje());
   const [consultas, setConsultas] = useState<Consulta[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -20,22 +21,29 @@ export function AgendaHoje() {
   const carregar = useCallback(async () => {
     if (!sessao) return;
     setErro(null);
+    setCarregando(true);
     try {
       const dados = await api.get<Consulta[]>(
-        `/consultas?clinicaId=${sessao.usuario.clinicaId}&data=${hoje()}`,
+        `/consultas?clinicaId=${sessao.usuario.clinicaId}&data=${data}`,
         sessao.accessToken,
       );
       setConsultas(dados);
     } catch (e) {
-      setErro(e instanceof ApiError ? e.message : 'Falha ao carregar a agenda de hoje.');
+      setErro(e instanceof ApiError ? e.message : 'Falha ao carregar a agenda desse dia.');
     } finally {
       setCarregando(false);
     }
-  }, [sessao]);
+  }, [sessao, data]);
 
   useEffect(() => {
     carregar();
   }, [carregar]);
+
+  // Trocar de dia invalida qualquer painel de remarcar/editar aberto — a
+  // consulta que ele referenciava pode nem aparecer mais na lista nova.
+  useEffect(() => {
+    setPainelAberto(null);
+  }, [data]);
 
   async function executarAcao(id: string, acao: 'confirmar' | 'cancelar') {
     if (!sessao) return;
@@ -62,14 +70,24 @@ export function AgendaHoje() {
     await carregar();
   }
 
-  if (carregando) return <p className="texto-suave">Carregando agenda…</p>;
-
   return (
     <div>
+      <div className="linha-selecao-data">
+        <label htmlFor="agenda-data">Data</label>
+        <input id="agenda-data" type="date" value={data} onChange={(e) => setData(e.target.value)} />
+        {data !== hoje() && (
+          <button className="botao-secundario" onClick={() => setData(hoje())}>
+            Hoje
+          </button>
+        )}
+      </div>
+
       {erro && <div className="mensagem-erro">{erro}</div>}
 
-      {consultas.length === 0 ? (
-        <p className="texto-suave">Nenhuma consulta para hoje.</p>
+      {carregando ? (
+        <p className="texto-suave">Carregando agenda…</p>
+      ) : consultas.length === 0 ? (
+        <p className="texto-suave">Nenhuma consulta nesse dia.</p>
       ) : (
         <table className="tabela">
           <thead>

@@ -334,6 +334,25 @@ label {
   align-items: flex-start;
 }
 
+.linha-selecao-data {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.linha-selecao-data label {
+  margin: 0;
+}
+
+.linha-selecao-data input {
+  margin: 0;
+}
+
+.linha-selecao-data button {
+  padding: 6px 12px;
+}
+
 .linha-busca input {
   flex: 1;
 }

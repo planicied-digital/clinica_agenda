@@ -15,7 +15,7 @@ export function DashboardPage() {
 
       <nav className="abas">
         <button className={aba === 'agenda' ? 'aba-ativa' : ''} onClick={() => setAba('agenda')}>
-          Agenda de hoje
+          Agenda
         </button>
         <button className={aba === 'nova-consulta' ? 'aba-ativa' : ''} onClick={() => setAba('nova-consulta')}>
           Nova consulta
