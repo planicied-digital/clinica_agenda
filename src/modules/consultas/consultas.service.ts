@@ -221,6 +221,12 @@ export class ConsultasService {
 
     await this.assertSlotLivre(consultaAntiga.clinicaId, consultaAntiga.medicoId, novaDataHoraInicio, novaDataHoraFim, consultaAntiga.id);
 
+    // Mesma regra do create() (seção 4): sem WhatsApp não entra na régua
+    // automática, cai direto pra contato manual da secretária.
+    const statusInicial = consultaAntiga.paciente.temWhatsapp
+      ? StatusConsulta.AGUARDANDO_CONFIRMACAO
+      : StatusConsulta.SOLICITADA;
+
     const novaConsulta = await this.prisma.$transaction(async (tx) => {
       const criada = await tx.consulta.create({
         data: {
@@ -233,7 +239,7 @@ export class ConsultasService {
           dataHoraFim: novaDataHoraFim,
           origem: consultaAntiga.origem,
           motivo: consultaAntiga.motivo,
-          status: StatusConsulta.AGUARDANDO_CONFIRMACAO,
+          status: statusInicial,
           remarcadaDeId: consultaAntiga.id,
         },
       });
@@ -257,6 +263,13 @@ export class ConsultasService {
         dataHoraInicio: novaConsulta.dataHoraInicio,
       });
       await this.agendarLembretes(novaConsulta);
+    } else {
+      await this.notificacoesService.enviarAlertaSecretaria({
+        clinicaId: novaConsulta.clinicaId,
+        consultaId: novaConsulta.id,
+        pacienteId: novaConsulta.pacienteId,
+        motivo: 'Consulta remarcada — paciente sem WhatsApp, confirmar manualmente',
+      });
     }
 
     // Libera o horário antigo para a fila de espera (mesma lógica do cancelamento — seção 4/6).
