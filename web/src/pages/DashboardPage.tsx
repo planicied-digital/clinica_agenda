@@ -1,25 +1,16 @@
 import { useState } from 'react';
-import { useAuth } from '../auth/AuthContext';
+import { Cabecalho } from '../components/Cabecalho';
 import { AgendaHoje } from '../components/AgendaHoje';
 import { Pendencias } from '../components/Pendencias';
 
 type Aba = 'agenda' | 'pendencias';
 
 export function DashboardPage() {
-  const { sessao, logout } = useAuth();
   const [aba, setAba] = useState<Aba>('agenda');
 
   return (
     <div className="pagina-dashboard">
-      <header className="cabecalho">
-        <div>
-          <strong>Planície Digital</strong>
-          <span className="texto-suave"> — {sessao?.usuario.nome}</span>
-        </div>
-        <button className="botao-secundario" onClick={logout}>
-          Sair
-        </button>
-      </header>
+      <Cabecalho />
 
       <nav className="abas">
         <button className={aba === 'agenda' ? 'aba-ativa' : ''} onClick={() => setAba('agenda')}>

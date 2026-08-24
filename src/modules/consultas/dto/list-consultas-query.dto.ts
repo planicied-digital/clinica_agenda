@@ -17,10 +17,21 @@ export class ListConsultasQueryDto {
   @IsString()
   pacienteId?: string;
 
-  // Filtra por um único dia (YYYY-MM-DD).
+  // Filtra por um único dia (YYYY-MM-DD). Tem prioridade sobre dataInicio/dataFim.
   @IsOptional()
   @IsDateString()
   data?: string;
+
+  // Intervalo de dias (YYYY-MM-DD, inclusive) — usado pela agenda semanal e por
+  // relatórios (ex.: taxa de comparecimento) que precisam de uma janela maior
+  // que um único dia. Qualquer um dos dois pode ser omitido para um intervalo aberto.
+  @IsOptional()
+  @IsDateString()
+  dataInicio?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dataFim?: string;
 
   @IsOptional()
   @IsEnum(StatusConsulta)

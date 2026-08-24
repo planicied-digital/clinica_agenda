@@ -138,6 +138,15 @@ export class ConsultasService {
       const fim = new Date(inicio);
       fim.setHours(23, 59, 59, 999);
       where.dataHoraInicio = { gte: inicio, lte: fim };
+    } else if (query.dataInicio || query.dataFim) {
+      const intervalo: Prisma.DateTimeFilter = {};
+      if (query.dataInicio) intervalo.gte = new Date(`${query.dataInicio}T00:00:00`);
+      if (query.dataFim) {
+        const fim = new Date(`${query.dataFim}T00:00:00`);
+        fim.setHours(23, 59, 59, 999);
+        intervalo.lte = fim;
+      }
+      where.dataHoraInicio = intervalo;
     }
 
     return this.prisma.consulta.findMany({

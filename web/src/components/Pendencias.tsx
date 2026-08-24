@@ -2,10 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { api, ApiError } from '../api/client';
 import type { Notificacao } from '../api/types';
-
-function formatarDataHora(iso: string): string {
-  return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-}
+import { formatarDataHora } from '../utils/data';
 
 export function Pendencias() {
   const { sessao } = useAuth();

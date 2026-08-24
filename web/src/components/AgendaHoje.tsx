@@ -2,28 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { api, ApiError } from '../api/client';
 import type { Consulta } from '../api/types';
-
-const STATUS_LABEL: Record<string, string> = {
-  SOLICITADA: 'Solicitada',
-  AGUARDANDO_CONFIRMACAO: 'Aguardando confirmação',
-  CONFIRMADA: 'Confirmada',
-  CANCELADA: 'Cancelada',
-  REMARCADA: 'Remarcada',
-  REALIZADA: 'Realizada',
-  NAO_COMPARECEU: 'Não compareceu',
-};
-
-const STATUS_CONFIRMAVEIS = new Set(['SOLICITADA', 'AGUARDANDO_CONFIRMACAO']);
-const STATUS_FINALIZADOS = new Set(['CANCELADA', 'REALIZADA', 'NAO_COMPARECEU', 'REMARCADA']);
-
-function hoje(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function formatarHora(iso: string): string {
-  return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-}
+import { hoje, formatarHora } from '../utils/data';
+import { STATUS_LABEL, STATUS_CONFIRMAVEIS, STATUS_FINALIZADOS } from '../utils/status';
 
 export function AgendaHoje() {
   const { sessao } = useAuth();
