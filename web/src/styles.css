@@ -1,0 +1,250 @@
+:root {
+  --cor-fundo: #f4f5f7;
+  --cor-cartao: #ffffff;
+  --cor-borda: #e2e4e9;
+  --cor-texto: #1f2430;
+  --cor-texto-suave: #6b7280;
+  --cor-primaria: #2f6fed;
+  --cor-primaria-hover: #1f5adb;
+  --cor-perigo: #d64545;
+  --cor-alerta-fundo: #fff4f4;
+  --raio: 8px;
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: var(--raio);
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  background: var(--cor-primaria);
+  color: white;
+  transition: background 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+  background: var(--cor-primaria-hover);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.botao-secundario {
+  background: transparent;
+  color: var(--cor-texto);
+  border: 1px solid var(--cor-borda);
+}
+
+button.botao-secundario:hover:not(:disabled) {
+  background: var(--cor-fundo);
+}
+
+input {
+  padding: 8px 10px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  font-size: 14px;
+  margin-bottom: 14px;
+}
+
+label {
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 4px;
+  color: var(--cor-texto-suave);
+}
+
+.tela-centralizada {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.cartao {
+  background: var(--cor-cartao);
+  border: 1px solid var(--cor-borda);
+  border-radius: 12px;
+  padding: 28px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.form-login {
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+}
+
+.form-login h1 {
+  margin: 0 0 2px;
+  font-size: 20px;
+}
+
+.subtitulo {
+  margin: 0 0 20px;
+  color: var(--cor-texto-suave);
+  font-size: 14px;
+}
+
+.mensagem-erro {
+  background: var(--cor-alerta-fundo);
+  color: var(--cor-perigo);
+  border: 1px solid #f3caca;
+  border-radius: var(--raio);
+  padding: 8px 12px;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.texto-suave {
+  color: var(--cor-texto-suave);
+  font-size: 13px;
+}
+
+.pagina-dashboard {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 20px 60px;
+}
+
+.cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.abas {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--cor-borda);
+  margin-bottom: 20px;
+}
+
+.abas button {
+  background: transparent;
+  color: var(--cor-texto-suave);
+  border-radius: 0;
+  padding: 10px 4px;
+  margin-right: 20px;
+  border-bottom: 2px solid transparent;
+}
+
+.abas button:hover:not(:disabled) {
+  background: transparent;
+  color: var(--cor-texto);
+}
+
+.abas button.aba-ativa {
+  color: var(--cor-primaria);
+  border-bottom-color: var(--cor-primaria);
+}
+
+.conteudo {
+  background: var(--cor-cartao);
+  border: 1px solid var(--cor-borda);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.tabela th {
+  text-align: left;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--cor-texto-suave);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.tabela td {
+  padding: 10px;
+  border-bottom: 1px solid var(--cor-borda);
+  vertical-align: middle;
+}
+
+.celula-acoes {
+  display: flex;
+  gap: 8px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #eef0f4;
+  color: var(--cor-texto-suave);
+}
+
+.badge-confirmada {
+  background: #e5f6ea;
+  color: #1e8a3c;
+}
+
+.badge-solicitada,
+.badge-aguardando_confirmacao {
+  background: #fff6e0;
+  color: #a5720b;
+}
+
+.badge-cancelada,
+.badge-nao_compareceu {
+  background: var(--cor-alerta-fundo);
+  color: var(--cor-perigo);
+}
+
+.badge-realizada {
+  background: #e7ecff;
+  color: #3348c9;
+}
+
+.etiqueta-alerta {
+  color: var(--cor-perigo);
+  font-size: 12px;
+}
+
+.lista-pendencias {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cartao-pendencia {
+  border: 1px solid var(--cor-borda);
+  border-left: 3px solid var(--cor-perigo);
+  border-radius: var(--raio);
+  padding: 12px 14px;
+}
+
+.pendencia-cabecalho {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}

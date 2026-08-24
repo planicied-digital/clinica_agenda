@@ -25,8 +25,13 @@ export class NotificacoesService {
     if (query.consultaId) where.consultaId = query.consultaId;
     if (query.pacienteId) where.pacienteId = query.pacienteId;
     if (query.status) where.status = query.status;
+    if (query.tipo) where.tipo = query.tipo;
 
-    return this.prisma.notificacao.findMany({ where, orderBy: { agendadaPara: 'desc' } });
+    return this.prisma.notificacao.findMany({
+      where,
+      orderBy: { agendadaPara: 'desc' },
+      include: { paciente: true, consulta: true },
+    });
   }
 
   // Encontra a última notificação em aberto do paciente e registra a resposta
@@ -155,8 +160,7 @@ export class NotificacoesService {
 
   // Escalonamento para contato manual (seção 4): paciente sem WhatsApp, sem
   // resposta após o 2º lembrete, pediu remarcação, ou aceitou vaga da fila.
-  // Não envia WhatsApp — só registra a pendência para o painel da secretária
-  // (painel ainda não implementado, ver roteiro no README/briefing).
+  // Não envia WhatsApp — só registra a pendência para o painel da secretária.
   async enviarAlertaSecretaria(params: {
     clinicaId: string;
     consultaId?: string | null;
@@ -172,6 +176,7 @@ export class NotificacoesService {
         tipo: TipoNotificacao.ALERTA_SECRETARIA,
         status: StatusNotificacao.PENDENTE,
         agendadaPara: new Date(),
+        detalhe: params.motivo,
       },
     });
   }

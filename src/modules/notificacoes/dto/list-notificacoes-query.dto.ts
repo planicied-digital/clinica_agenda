@@ -1,5 +1,5 @@
 import { IsEnum, IsOptional, IsString } from 'class-validator';
-import { StatusNotificacao } from '@prisma/client';
+import { StatusNotificacao, TipoNotificacao } from '@prisma/client';
 
 export class ListNotificacoesQueryDto {
   @IsString()
@@ -16,4 +16,8 @@ export class ListNotificacoesQueryDto {
   @IsOptional()
   @IsEnum(StatusNotificacao)
   status?: StatusNotificacao;
+
+  @IsOptional()
+  @IsEnum(TipoNotificacao)
+  tipo?: TipoNotificacao;
 }

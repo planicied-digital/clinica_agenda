@@ -1,0 +1,124 @@
+import { useCallback, useEffect, useState } from 'react';
+import { useAuth } from '../auth/AuthContext';
+import { api, ApiError } from '../api/client';
+import type { Consulta } from '../api/types';
+
+const STATUS_LABEL: Record<string, string> = {
+  SOLICITADA: 'Solicitada',
+  AGUARDANDO_CONFIRMACAO: 'Aguardando confirmação',
+  CONFIRMADA: 'Confirmada',
+  CANCELADA: 'Cancelada',
+  REMARCADA: 'Remarcada',
+  REALIZADA: 'Realizada',
+  NAO_COMPARECEU: 'Não compareceu',
+};
+
+const STATUS_CONFIRMAVEIS = new Set(['SOLICITADA', 'AGUARDANDO_CONFIRMACAO']);
+const STATUS_FINALIZADOS = new Set(['CANCELADA', 'REALIZADA', 'NAO_COMPARECEU', 'REMARCADA']);
+
+function hoje(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function formatarHora(iso: string): string {
+  return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+export function AgendaHoje() {
+  const { sessao } = useAuth();
+  const [consultas, setConsultas] = useState<Consulta[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
+  const [acaoEmAndamentoId, setAcaoEmAndamentoId] = useState<string | null>(null);
+
+  const carregar = useCallback(async () => {
+    if (!sessao) return;
+    setErro(null);
+    try {
+      const dados = await api.get<Consulta[]>(
+        `/consultas?clinicaId=${sessao.usuario.clinicaId}&data=${hoje()}`,
+        sessao.accessToken,
+      );
+      setConsultas(dados);
+    } catch (e) {
+      setErro(e instanceof ApiError ? e.message : 'Falha ao carregar a agenda de hoje.');
+    } finally {
+      setCarregando(false);
+    }
+  }, [sessao]);
+
+  useEffect(() => {
+    carregar();
+  }, [carregar]);
+
+  async function executarAcao(id: string, acao: 'confirmar' | 'cancelar') {
+    if (!sessao) return;
+    setAcaoEmAndamentoId(id);
+    try {
+      const corpo = acao === 'cancelar' ? { motivo: 'Cancelado pela secretária no painel' } : {};
+      await api.post(`/consultas/${id}/${acao}`, corpo, sessao.accessToken);
+      await carregar();
+    } catch (e) {
+      setErro(e instanceof ApiError ? e.message : `Falha ao ${acao} a consulta.`);
+    } finally {
+      setAcaoEmAndamentoId(null);
+    }
+  }
+
+  if (carregando) return <p className="texto-suave">Carregando agenda…</p>;
+
+  return (
+    <div>
+      {erro && <div className="mensagem-erro">{erro}</div>}
+
+      {consultas.length === 0 ? (
+        <p className="texto-suave">Nenhuma consulta para hoje.</p>
+      ) : (
+        <table className="tabela">
+          <thead>
+            <tr>
+              <th>Horário</th>
+              <th>Paciente</th>
+              <th>Médico</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {consultas.map((c) => (
+              <tr key={c.id}>
+                <td>{formatarHora(c.dataHoraInicio)}</td>
+                <td>
+                  {c.paciente.nome}
+                  {!c.paciente.temWhatsapp && <span className="etiqueta-alerta"> sem WhatsApp</span>}
+                </td>
+                <td>{c.medico.nome}</td>
+                <td>
+                  <span className={`badge badge-${c.status.toLowerCase()}`}>
+                    {STATUS_LABEL[c.status] ?? c.status}
+                  </span>
+                </td>
+                <td className="celula-acoes">
+                  <button
+                    disabled={!STATUS_CONFIRMAVEIS.has(c.status) || acaoEmAndamentoId === c.id}
+                    onClick={() => executarAcao(c.id, 'confirmar')}
+                  >
+                    Confirmar
+                  </button>
+                  <button
+                    className="botao-secundario"
+                    disabled={STATUS_FINALIZADOS.has(c.status) || acaoEmAndamentoId === c.id}
+                    onClick={() => executarAcao(c.id, 'cancelar')}
+                  >
+                    Cancelar
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}

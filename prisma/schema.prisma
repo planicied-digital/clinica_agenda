@@ -372,6 +372,10 @@ model Notificacao {
   canal CanalNotificacao @default(WHATSAPP)
   tipo  TipoNotificacao
 
+  // Motivo legível do alerta (preenchido em ALERTA_SECRETARIA) — exibido no
+  // painel da secretária; nos outros tipos fica nulo (o conteúdo já é fixo).
+  detalhe String?
+
   status StatusNotificacao @default(PENDENTE)
 
   agendadaPara DateTime

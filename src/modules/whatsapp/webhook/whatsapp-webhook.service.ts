@@ -88,6 +88,7 @@ export class WhatsappWebhookService {
             tipo: TipoNotificacao.ALERTA_SECRETARIA,
             status: StatusNotificacao.PENDENTE,
             agendadaPara: new Date(),
+            detalhe: 'Paciente pediu remarcação via WhatsApp — oferecer novos horários',
           },
         });
         break;
