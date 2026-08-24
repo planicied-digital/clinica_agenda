@@ -2,6 +2,7 @@ import { Body, Controller, Get, Logger, Post, Query, Res } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
 import { WhatsappWebhookService } from './whatsapp-webhook.service';
+import { Public } from '../../../common/auth/public.decorator';
 
 interface WhatsappWebhookPayload {
   entry?: Array<{
@@ -23,6 +24,10 @@ interface WhatsappWebhookPayload {
   }>;
 }
 
+// Chamado pela Meta, não por um usuário logado no painel — sem JWT. A
+// verificação de handshake (GET) e o verify_token do POST são a autenticação
+// deste endpoint.
+@Public()
 @Controller('whatsapp/webhook')
 export class WhatsappWebhookController {
   private readonly logger = new Logger(WhatsappWebhookController.name);
