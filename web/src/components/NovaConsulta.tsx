@@ -8,12 +8,29 @@ import { SeletorDeHorario } from './SeletorDeHorario';
 
 interface NovoPacienteForm {
   nome: string;
+  telefone: string;
+  cpf: string;
   dataNascimento: string;
   convenio: string;
   temWhatsapp: boolean;
 }
 
-const NOVO_PACIENTE_VAZIO: NovoPacienteForm = { nome: '', dataNascimento: '', convenio: '', temWhatsapp: true };
+const NOVO_PACIENTE_VAZIO: NovoPacienteForm = {
+  nome: '',
+  telefone: '',
+  cpf: '',
+  dataNascimento: '',
+  convenio: '',
+  temWhatsapp: true,
+};
+
+// CPF tem 11 dígitos; se o que a secretária digitou na busca bater com esse
+// tamanho, é mais provável ser CPF do que telefone — mas o campo errado fica
+// vazio e editável, nunca preenchido com o valor errado.
+function preencherContatoInicial(contato: string): Pick<NovoPacienteForm, 'telefone' | 'cpf'> {
+  const digitos = contato.replace(/\D/g, '');
+  return digitos.length === 11 ? { telefone: '', cpf: contato } : { telefone: contato, cpf: '' };
+}
 
 export function NovaConsulta({ onCriada }: { onCriada: () => void }) {
   const { sessao } = useAuth();
@@ -97,7 +114,7 @@ export function NovaConsulta({ onCriada }: { onCriada: () => void }) {
         setPaciente(encontrado);
       } else {
         setNaoEncontrado(true);
-        setNovoPaciente({ ...NOVO_PACIENTE_VAZIO });
+        setNovoPaciente({ ...NOVO_PACIENTE_VAZIO, ...preencherContatoInicial(contato) });
       }
     } catch (e) {
       setErroBusca(e instanceof ApiError ? e.message : 'Falha ao buscar paciente.');
@@ -108,6 +125,10 @@ export function NovaConsulta({ onCriada }: { onCriada: () => void }) {
 
   async function cadastrarPaciente() {
     if (!sessao || !novoPaciente.nome.trim()) return;
+    if (!novoPaciente.telefone.trim()) {
+      setErroCadastro('Informe o telefone do paciente.');
+      return;
+    }
     setCadastrando(true);
     setErroCadastro(null);
     try {
@@ -116,7 +137,8 @@ export function NovaConsulta({ onCriada }: { onCriada: () => void }) {
         {
           clinicaId,
           nome: novoPaciente.nome,
-          telefone: contato,
+          telefone: novoPaciente.telefone,
+          cpf: novoPaciente.cpf || undefined,
           dataNascimento: novoPaciente.dataNascimento || undefined,
           convenio: novoPaciente.convenio || undefined,
           temWhatsapp: novoPaciente.temWhatsapp,
@@ -208,6 +230,20 @@ export function NovaConsulta({ onCriada }: { onCriada: () => void }) {
                 onChange={(e) => setNovoPaciente({ ...novoPaciente, nome: e.target.value })}
               />
 
+              <label htmlFor="novoTelefone">Telefone</label>
+              <input
+                id="novoTelefone"
+                value={novoPaciente.telefone}
+                onChange={(e) => setNovoPaciente({ ...novoPaciente, telefone: e.target.value })}
+              />
+
+              <label htmlFor="novoCpf">CPF (opcional)</label>
+              <input
+                id="novoCpf"
+                value={novoPaciente.cpf}
+                onChange={(e) => setNovoPaciente({ ...novoPaciente, cpf: e.target.value })}
+              />
+
               <label htmlFor="novoNascimento">Data de nascimento (opcional)</label>
               <input
                 id="novoNascimento"
@@ -234,7 +270,10 @@ export function NovaConsulta({ onCriada }: { onCriada: () => void }) {
 
               {erroCadastro && <div className="mensagem-erro">{erroCadastro}</div>}
 
-              <button onClick={cadastrarPaciente} disabled={cadastrando || !novoPaciente.nome.trim()}>
+              <button
+                onClick={cadastrarPaciente}
+                disabled={cadastrando || !novoPaciente.nome.trim() || !novoPaciente.telefone.trim()}
+              >
                 {cadastrando ? 'Cadastrando…' : 'Cadastrar e continuar'}
               </button>
             </div>
