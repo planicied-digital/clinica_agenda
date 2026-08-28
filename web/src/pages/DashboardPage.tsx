@@ -1,13 +1,21 @@
 import { useState } from 'react';
 import { Cabecalho } from '../components/Cabecalho';
 import { AgendaHoje } from '../components/AgendaHoje';
+import type { FocoAgenda } from '../components/AgendaHoje';
 import { Pendencias } from '../components/Pendencias';
 import { NovaConsulta } from '../components/NovaConsulta';
+import { chaveDia } from '../utils/data';
 
 type Aba = 'agenda' | 'nova-consulta' | 'pendencias';
 
 export function DashboardPage() {
   const [aba, setAba] = useState<Aba>('agenda');
+  const [focoAgenda, setFocoAgenda] = useState<FocoAgenda | null>(null);
+
+  function abrirConsultaNaAgenda(consultaId: string, dataISO: string) {
+    setFocoAgenda({ consultaId, data: chaveDia(dataISO) });
+    setAba('agenda');
+  }
 
   return (
     <div className="pagina-dashboard">
@@ -26,9 +34,11 @@ export function DashboardPage() {
       </nav>
 
       <main className="conteudo">
-        {aba === 'agenda' && <AgendaHoje />}
+        {aba === 'agenda' && (
+          <AgendaHoje focoAgenda={focoAgenda} onFocoConsumido={() => setFocoAgenda(null)} />
+        )}
         {aba === 'nova-consulta' && <NovaConsulta onCriada={() => setAba('agenda')} />}
-        {aba === 'pendencias' && <Pendencias />}
+        {aba === 'pendencias' && <Pendencias onAbrirConsulta={abrirConsultaNaAgenda} />}
       </main>
     </div>
   );

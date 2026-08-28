@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { api, ApiError } from '../api/client';
 import type { Consulta } from '../api/types';
@@ -9,14 +9,33 @@ import { PainelEditarConsulta } from './PainelEditarConsulta';
 
 type PainelAberto = { consultaId: string; modo: 'remarcar' | 'editar' } | null;
 
-export function AgendaHoje() {
+export interface FocoAgenda {
+  consultaId: string;
+  data: string;
+}
+
+interface AgendaHojeProps {
+  focoAgenda?: FocoAgenda | null;
+  onFocoConsumido?: () => void;
+}
+
+export function AgendaHoje({ focoAgenda = null, onFocoConsumido }: AgendaHojeProps) {
   const { sessao } = useAuth();
-  const [data, setData] = useState(hoje());
+  // Já nasce na data certa quando vem de uma pendência — se começasse em
+  // hoje() e só depois trocasse pra focoAgenda.data, duas buscas ficariam em
+  // voo ao mesmo tempo (a de hoje() e a da data certa), e não há garantia de
+  // qual delas resolve por último: a errada podia sobrescrever consultas com
+  // o dia errado bem na hora em que o efeito de abrir o painel checava a
+  // lista, fazendo a consulta "sumir" mesmo já carregada corretamente logo
+  // em seguida.
+  const [data, setData] = useState(() => focoAgenda?.data ?? hoje());
   const [consultas, setConsultas] = useState<Consulta[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [acaoEmAndamentoId, setAcaoEmAndamentoId] = useState<string | null>(null);
   const [painelAberto, setPainelAberto] = useState<PainelAberto>(null);
+  const [linhaDestacada, setLinhaDestacada] = useState<string | null>(null);
+  const linhasRef = useRef<Record<string, HTMLTableRowElement | null>>({});
 
   const carregar = useCallback(async () => {
     if (!sessao) return;
@@ -44,6 +63,35 @@ export function AgendaHoje() {
   useEffect(() => {
     setPainelAberto(null);
   }, [data]);
+
+  // Chegada de uma pendência (seção "Pendências") — leva a data pro dia da
+  // consulta em questão. A abertura do painel só acontece depois, no efeito
+  // seguinte, quando a lista daquele dia já tiver carregado.
+  useEffect(() => {
+    if (!focoAgenda) return;
+    if (data !== focoAgenda.data) {
+      setData(focoAgenda.data);
+    }
+  }, [focoAgenda, data]);
+
+  useEffect(() => {
+    if (!focoAgenda || carregando || data !== focoAgenda.data) return;
+    const consultaAlvo = consultas.find((c) => c.id === focoAgenda.consultaId);
+    if (consultaAlvo) {
+      setPainelAberto({ consultaId: focoAgenda.consultaId, modo: 'editar' });
+      setLinhaDestacada(focoAgenda.consultaId);
+      linhasRef.current[focoAgenda.consultaId]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      setErro('A consulta dessa pendência não foi encontrada na agenda desse dia.');
+    }
+    onFocoConsumido?.();
+  }, [focoAgenda, carregando, data, consultas, onFocoConsumido]);
+
+  useEffect(() => {
+    if (!linhaDestacada) return;
+    const timeout = setTimeout(() => setLinhaDestacada(null), 2000);
+    return () => clearTimeout(timeout);
+  }, [linhaDestacada]);
 
   async function executarAcao(id: string, acao: 'confirmar' | 'cancelar') {
     if (!sessao) return;
@@ -102,7 +150,12 @@ export function AgendaHoje() {
           <tbody>
             {consultas.map((c) => (
               <Fragment key={c.id}>
-                <tr>
+                <tr
+                  ref={(el) => {
+                    linhasRef.current[c.id] = el;
+                  }}
+                  className={linhaDestacada === c.id ? 'linha-destacada' : undefined}
+                >
                   <td>{formatarHora(c.dataHoraInicio)}</td>
                   <td>
                     {c.paciente.nome}

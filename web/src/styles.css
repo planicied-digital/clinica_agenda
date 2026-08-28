@@ -253,6 +253,32 @@ label {
   margin-bottom: 4px;
 }
 
+.pendencia-consulta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.pendencia-consulta button {
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
+.linha-destacada {
+  animation: destaque-linha 2s ease-out;
+}
+
+@keyframes destaque-linha {
+  from {
+    background-color: #fff6d8;
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
 .cartao-estatistica {
   background: var(--cor-cartao);
   border: 1px solid var(--cor-borda);

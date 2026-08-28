@@ -4,7 +4,11 @@ import { api, ApiError } from '../api/client';
 import type { Notificacao } from '../api/types';
 import { formatarDataHora } from '../utils/data';
 
-export function Pendencias() {
+interface PendenciasProps {
+  onAbrirConsulta: (consultaId: string, dataISO: string) => void;
+}
+
+export function Pendencias({ onAbrirConsulta }: PendenciasProps) {
   const { sessao } = useAuth();
   const [pendencias, setPendencias] = useState<Notificacao[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -40,7 +44,15 @@ export function Pendencias() {
           <div className="texto-suave">{p.paciente.telefone}</div>
           <p>{p.detalhe ?? 'Requer contato manual.'}</p>
           {p.consulta && (
-            <div className="texto-suave">Consulta: {formatarDataHora(p.consulta.dataHoraInicio)}</div>
+            <div className="pendencia-consulta">
+              <span className="texto-suave">Consulta: {formatarDataHora(p.consulta.dataHoraInicio)}</span>
+              <button
+                className="botao-secundario"
+                onClick={() => onAbrirConsulta(p.consulta!.id, p.consulta!.dataHoraInicio)}
+              >
+                Ver na agenda
+              </button>
+            </div>
           )}
         </li>
       ))}
