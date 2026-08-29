@@ -18,6 +18,9 @@ export class UpdateClinicaDto {
   @IsString()
   endereco?: string;
 
+  // Ver mesmo comentário em CreateClinicaDto — campo não lido por nenhum
+  // serviço; o fuso efetivo é o TZ do processo (Dockerfile), global pra todas
+  // as clínicas.
   @IsOptional()
   @IsString()
   timezone?: string;

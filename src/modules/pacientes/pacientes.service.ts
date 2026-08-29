@@ -14,6 +14,13 @@ export class PacientesService {
       data: {
         ...dto,
         telefone: normalizarTelefone(dto.telefone),
+        // dataNascimento chega como "YYYY-MM-DD" (sem horário) — por spec do
+        // ECMAScript, new Date() de uma string só-data é SEMPRE interpretada
+        // como UTC, independente do TZ do processo. Isso é seguro enquanto o
+        // valor só for guardado/reexibido cru (input type=date no front); se
+        // algum dia for formatado com toLocaleDateString()/toLocaleString()
+        // (que usam o TZ local, hoje America/Manaus), o dia pode "voltar" um
+        // pra trás — formate em UTC (ex: .toISOString().slice(0,10)) nesse caso.
         dataNascimento: dto.dataNascimento ? new Date(dto.dataNascimento) : undefined,
       },
     });
