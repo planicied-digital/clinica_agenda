@@ -84,14 +84,18 @@ export class PacientesService {
 
   async update(id: string, dto: UpdatePacienteDto) {
     await this.findOne(id);
-    return this.prisma.paciente.update({
-      where: { id },
-      data: {
-        ...dto,
-        telefone: dto.telefone ? normalizarTelefone(dto.telefone) : undefined,
-        dataNascimento: dto.dataNascimento ? new Date(dto.dataNascimento) : undefined,
-      },
-    });
+    try {
+      return await this.prisma.paciente.update({
+        where: { id },
+        data: {
+          ...dto,
+          telefone: dto.telefone ? normalizarTelefone(dto.telefone) : undefined,
+          dataNascimento: dto.dataNascimento ? new Date(dto.dataNascimento) : undefined,
+        },
+      });
+    } catch (erro) {
+      throw this.paraConflitoDeUnicidade(erro);
+    }
   }
 
   // Traduz P2002 (constraint única "clinicaId_<campo>") num 409 com mensagem
