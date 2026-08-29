@@ -1,6 +1,7 @@
 FROM node:20-alpine AS build
 WORKDIR /app
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl tzdata
+ENV TZ=America/Manaus
 
 COPY package*.json ./
 COPY prisma ./prisma
@@ -14,8 +15,9 @@ RUN npx prisma generate && npm run build
 
 FROM node:20-alpine AS runtime
 WORKDIR /app
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl tzdata
 ENV NODE_ENV=production
+ENV TZ=America/Manaus
 
 COPY package*.json ./
 COPY prisma ./prisma
