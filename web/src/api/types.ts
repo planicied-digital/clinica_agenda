@@ -51,6 +51,16 @@ export interface Sala {
   nome: string;
 }
 
+export type DiaSemana = 'DOMINGO' | 'SEGUNDA' | 'TERCA' | 'QUARTA' | 'QUINTA' | 'SEXTA' | 'SABADO';
+
+export interface HorarioAtendimento {
+  id: string;
+  medicoId: string;
+  diaSemana: DiaSemana;
+  horaInicioMinutos: number;
+  horaFimMinutos: number;
+}
+
 export interface SlotDisponivel {
   inicio: string;
   fim: string;

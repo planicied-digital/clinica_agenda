@@ -4,9 +4,10 @@ import { AgendaHoje } from '../components/AgendaHoje';
 import type { FocoAgenda } from '../components/AgendaHoje';
 import { Pendencias } from '../components/Pendencias';
 import { NovaConsulta } from '../components/NovaConsulta';
+import { HorariosAtendimento } from '../components/HorariosAtendimento';
 import { chaveDia } from '../utils/data';
 
-type Aba = 'agenda' | 'nova-consulta' | 'pendencias';
+type Aba = 'agenda' | 'nova-consulta' | 'pendencias' | 'horarios';
 
 export function DashboardPage() {
   const [aba, setAba] = useState<Aba>('agenda');
@@ -31,6 +32,9 @@ export function DashboardPage() {
         <button className={aba === 'pendencias' ? 'aba-ativa' : ''} onClick={() => setAba('pendencias')}>
           Pendências
         </button>
+        <button className={aba === 'horarios' ? 'aba-ativa' : ''} onClick={() => setAba('horarios')}>
+          Horários de atendimento
+        </button>
       </nav>
 
       <main className="conteudo">
@@ -39,6 +43,7 @@ export function DashboardPage() {
         )}
         {aba === 'nova-consulta' && <NovaConsulta onCriada={() => setAba('agenda')} />}
         {aba === 'pendencias' && <Pendencias onAbrirConsulta={abrirConsultaNaAgenda} />}
+        {aba === 'horarios' && <HorariosAtendimento />}
       </main>
     </div>
   );
