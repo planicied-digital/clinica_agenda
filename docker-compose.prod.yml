@@ -46,8 +46,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # Só em 127.0.0.1: o acesso público passa pelo nginx do host (com TLS). Publicar em 0.0.0.0
+    # deixaria a porta aberta na internet em HTTP puro — o Docker fura o firewall (UFW) do host.
     ports:
-      - "${API_PORT:-3000}:3000"
+      - "127.0.0.1:${API_PORT:-3000}:3000"
     # Migrations não rodam automaticamente no boot — ver DEPLOY.md
     # ("npx prisma migrate deploy" antes de trocar de versão em produção).
 
@@ -58,8 +60,9 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL}
     restart: unless-stopped
+    # Mesmo motivo da api: só o nginx do host acessa.
     ports:
-      - "${WEB_PORT:-8080}:80"
+      - "127.0.0.1:${WEB_PORT:-8080}:80"
     depends_on:
       - api
 

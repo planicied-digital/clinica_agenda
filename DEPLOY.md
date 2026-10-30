@@ -13,7 +13,8 @@ segurança básica.
 - Um reverse proxy com TLS na frente dos containers (Caddy é o mais simples —
   renova certificado sozinho; nginx+certbot também funciona). Este repo **não
   inclui TLS** — os containers `api` (porta 3000) e `web` (porta 8080) sobem
-  em HTTP puro, pra você decidir o proxy.
+  em HTTP puro, publicados só em `127.0.0.1` (o proxy precisa rodar no mesmo
+  servidor), pra você decidir o proxy.
 - Conta WhatsApp Cloud API configurada na Meta, com o número de telefone já
   aprovado.
 
@@ -47,7 +48,9 @@ docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 Isso sobe `postgres`, `redis`, `api` (porta 3000) e `web` (porta 8080, estático
-via nginx). Aponte seu reverse proxy pra essas duas portas.
+via nginx), ambas só em `127.0.0.1` — não ficam acessíveis de fora, nem com
+firewall liberado (o Docker publica portas por fora do UFW). Aponte seu reverse
+proxy pra `127.0.0.1:3000` e `127.0.0.1:8080`.
 
 ## 3. Rodar as migrations
 
